@@ -11,7 +11,7 @@
 ### error.children可以分辨错误类型，根据不同类型对于不同错误提示）
 
 
-###2、如果配置校验通过。创建compiler。如果传入的配置是几份不同的配置，（config文件导出的是数组）， 则调用
+### 2、如果配置校验通过。创建compiler。如果传入的配置是几份不同的配置，（config文件导出的是数组）， 则调用
 
 ### createMultiCompiler ，createMutiCompiler遍历每一个配置项，调用createCompiler。 createCompiler调用
 
