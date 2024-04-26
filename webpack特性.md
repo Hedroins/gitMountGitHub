@@ -138,6 +138,62 @@ devServer会启动一个服务器用于服务网页请求，同时会帮助启�
   compress:是否启用gzip压缩
 
 ## 性能优化
+   1、缩小文件的查找范围 
+        优化loader配置，增加include配置只命中需要处理的文件
+        优化resolve.modules配置，直接指明第三方工具库的存放路径，减少不必要的查找。
+        优化mainFields,这个值的默认值和target配置有关，如果target为web或者webworker则mainFields默认值为['browser', 'module', 'main']，如果target为node则mainFields默认值为['module', 'main']。
+        为了减搜索步骤在明确第三方模块的入口文件描述字段时，将其设置得尽可能少。
+        优化resolve.alias，减少文件的查询路径。
+        优化resolve.extensions，减少文件后缀尝试次数。
+        优化resolve.cacheWithContext，是否缓存文件查找结果。
+        优化module.noParse，不需要解析的文件。
+        优化module.unsafeCache，不需要缓存的文件。
+        优化module.unknownContextCritical，不安全的上下文。
+
+   2、使用DllPlugin和DllReferencePlugin优化打包速度
+        DllPlugin:将第三方库单独打包，避免每次构建都重新打包第三方库。
+        DllReferencePlugin:在配置文件中引入DllPlugin打包好的第三方库。
+   3、使用HappyPack在执行loader时,将任务分解给多个子进程去并发执行，子进程处理完后再将结果发送给主进程。HappyPack的配置项如下：
+       threadPool:配置线程池，可以指定一个已存在的线程池，也可以自己创建一个线程池。
+       id:配置HappyPack的标识符，每个HappyPack的实例都有一个唯一的标识符。
+       loaders:配置HappyPack要使用的loader。
+       verbose:是否允许输出日志信息。
+
+   4、使用ParallelUglifyPlugin,将压缩JS代码任务分解给多个子进程去并发执行，子进程处理完后再将结果发送给主进程。
+
+
+   5、watchOptions poll越小越好（每秒轮询次数）. aggregateTimeout越大越好（文件发生变化后，等待多久重新构建）
+
+   6、使用Tree Shaking,Tree Shaking的原理是：在打包过程中，会分析模块之间的依赖关系，找到模块之间没有引用关系的代码，然后将这部分代码删除，从而实现打包结果的优化。
+
+   7、使用Scope Hoisting,Scope Hoisting的原理是：在打包过程中，会将所有的模块代码按照引用顺序放在一个函数作用域里，然后适当的重命名一些变量以防止变量名冲突。
+      使用方法：
+         optimization:{
+             usedExports:true, // 开启Tree Shaking
+             concatenateModules:true, // 开启Scope Hoisting
+         }
+         
+
+   
+   8、definePlugin:配置全局常量,
+
+   9、压缩CSS代码PostCss
+
+   10、提取公共代码CommonChunkPlugin, 用法new CommonChunkPlugin({
+       name: 'common', //提取出的公共部分形成的一个新的chunk名称
+       chunks: ['a','b'], //从哪些chunk中提取代码
+       minChunks?:1
+   })
+
+   11、提取公共代码SplitChunksPlugin, 用法new SplitChunksPlugin({
+       chunks: 'all',
+       minSize: 30000, // 模块超过30k会被提取到公共模块
+       minChunks: 1, // 模块至少被引用1次
+       maxAsyncRequests: 5, // 按需加载时候最大的并行请求数
+   })
+
+   12、webpackAnalyse:分析打包结果
+ 
 
 ## 代码分割
 
@@ -191,5 +247,47 @@ stage4 在接下来的一年里将会加入到标准里
 1、如果提取组件的公共代码？
 2、Service Workers的使用。 可以通过navigator.serviceWorker判断是否支持serviceWorker
    ServiceWorkers的应用背景缓存。 ServiceWorkers只有在HTTPS下才能正常工作。
-4
-    
+4、webpack-dev-middleware 可以基于现有的服务器实现devServer
+5、file-loader可以将js、css导入图片替换为正确的地址
+6、url-loader可以将js、css导入图片替换为正确的地址，并且可以设置图片大小，小于设置的值则转换为base64，limit选项可以控制图片的限制，如果大于limit会用fallback指定的loader，如果小于limit
+   会用url-loader来处理图片。
+7、加载svg 可能用到的loader raw-loader file-loader svg-inline-loader(和raw-loader类似，但是可以处理svg,去除无关的节点)
+8、loader本质上是导出的一个函数,第一个参数是处理前的源码，在loader中获取用户传的参数let options = loaderUtils.getOptions(this);
+   webpack向loader提供的通信API，在loader中调用this.callback(err, content, sourceMap, meta)可以返回处理后的结果。调用this.sourceMap获取sourceMap信息，调用this.emitFile(name, content)可以生成一个文件。
+9、异步loader 调用this.async()可以返回一个Promise对象，在Promise对象中调用this.callback(err, content, sourceMap, meta)可以返回处理后的结果。
+
+10、loader的this对象
+   this.query:获取用户传的参数
+   this.context:处理的当前文件所在的目录
+   this.callback:返回处理后的结果
+   this.async:返回一个Promise对象
+   this.cacheable:是否缓存 // this.cacheable(false)关闭缓存
+   this.addDependency:添加依赖
+   this.addContextDependency:添加上下文依赖
+   this.resource:获取当前处理的文件的完整请求路径
+   this.resourcePath:获取当前处理的文件的路径
+   this.resourceQuery:获取当前处理的文件的查询字符串
+   this.sourceMap:获取当前处理的文件的sourceMap
+   this.emitFile:生成一个文件
+   this.fs:获取文件系统
+   this.resolve:解析模块路径
+   this.options:获取用户配置的options
+   this.loadModule:在Loader处理一个文件时，如果依赖其他文件的处理结果，可以通过this.loadModule(request: string, callback: function(err, source, sourceMap, module))来加载其他文件的处理结果。
+   this.exec:执行一个loader
+
+11、loader获取webpack传递的二进制数据：
+    loader里写上 exports.raw = true;
+
+12、loader获取webpack传递的源码数据：
+     exports.source = true;
+
+13、loader获取webpack传递的源码数据和二进制数据：
+     exports.raw = true;
+     exports.source = true;
+
+14、loader获取webpack传递的源码数据和二进制数据：
+     exports.raw = true;
+     exports.source = true;
+
+15、loader获取webpack传递的源码数据和二进制数据：
+
