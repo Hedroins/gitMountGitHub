@@ -145,7 +145,7 @@ devServer会启动一个服务器用于服务网页请求，同时会帮助启�
         为了减搜索步骤在明确第三方模块的入口文件描述字段时，将其设置得尽可能少。
         优化resolve.alias，减少文件的查询路径。
         优化resolve.extensions，减少文件后缀尝试次数。
-        优化resolve.cacheWithContext，是否缓存文件查找结果。
+        优化resolve.cacheWithContext，是否缓存文件查找结果。可以指定为true,也可以指定为一个对象。对象有cacheDirectory配置缓存存放的目录。
         优化module.noParse，不需要解析的文件。
         优化module.unsafeCache，不需要缓存的文件。
         优化module.unknownContextCritical，不安全的上下文。
@@ -291,3 +291,133 @@ stage4 在接下来的一年里将会加入到标准里
 
 15、loader获取webpack传递的源码数据和二进制数据：
 
+16、webpack 开启watch功能 ：1、命令行加上--watch 2、配置文件中加上watch: true
+
+17、webpack 文件监听的原理：通过文件系统的事件来监听文件的变化，当文件发生变化时，重新构建。
+
+18、webpack 文件监听的原理：通过文件系统的事件来监听文件的变化，当文件发生变化时，重新构建。 当某个文件发生了变化，并不会立刻告诉监听者，而是先缓存起来，等aggregateTimeout时间到了，再一次性告诉监听者，这样可以避免频繁的构建。
+
+module.exports = {
+  watch:true,
+  watchOptions:{
+    ignored:/node_modules/, // 默认为空，不监听的文件或者文件夹，支持正则匹配
+    // 监听到变化发生后会等300ms再去执行，默认300ms
+    aggregateTimeout:300,
+    //判断文件是否发生变化是通过不停询问系统指定文件有没有变化实现的，默认每秒询问1000次
+    poll:1000,
+  }
+}
+
+
+
+20、webpack 热更新原理：
+ webpack Compile 将JS编译成Bundle
+ HMR Server 将热更新的文件输出给HMR Runtime
+ Bundle Server 提供文件在浏览器的访问
+ HMR Runtime 会被注入到浏览器，更新文件的变化
+ bundle.js 构建输出的文件
+
+
+整个过程：
+   1、启动阶段，webpack 编译，将编译好的内容传输给bundle Server服务器 ，Bundle Server 以服务器的方式提供文件访问
+   2、更新阶段，修改源码之后 引起文件系统的变化 然后通过WebPack Compile编译，编译完成后将代码发送给HMR Server ,HMR Server知道哪些文件发生改变，HMR Server通过WebSocket的方式以JSon将变化的代码通知HMR Runtime,HMR Runtime改变代码，且不需要刷新浏览器
+
+
+webpack js 压缩：uglifyjs-webpack-plugin
+webpack css 压缩：optimize-css-assets-webpack-plugin
+webpack html 压缩：html-webpack-plugin
+webpack 图片压缩：image-webpack-loader
+
+minicss-extract-plugin 提取css文件
+
+自动清理构建目录：clean-webpack-plugin
+
+webpack 打包速度优化：
+1、优化loader配置，减少loader的搜索范围
+2、使用include exclude
+3、babel-loader 开启缓存 cacheDirectory:true
+4、使用thread-loader happy-pack
+5、使用DllPlugin DllReferencePlugin
+6、source-map-loader
+7、babel-loader 开启缓存 cacheDirectory:true
+8、使用thread-loader happy-pack
+9、使用DllPlugin DllReferencePlugin
+10、source-map-loader
+
+webpack 打包体积优化：
+1、按需加载
+2、tree-shaking
+
+postcss-loader autoprefixer 对添加CSS前缀
+
+
+
+rem是相对单位
+px是绝对单位
+
+px2rem-loader 将px 转为rem  remUnit配置 1rem = xx px, remPrecesion:8 px转为rem小数位数
+
+lib-flexible 动态计算根元素的px
+
+
+资源内联： required('raw-loader!./meta.html')
+          required('raw-loader!babel-loader!../../node_modules/lib-flexible/flexible.js')
+前面指定相关的loader处理，将处理之后的内容嵌入指定的位置
+
+
+tree shaking：
+概念：1个模块可能有多个方法，只要其中的某个方法使用到了。则整个文件都会被打包到bundle里面去，tree shaking就是只把用到的方法打入bundle, 没用到的方法会在uglify阶段被擦除掉
+
+使用：webpack默认支持，在.babelrc里设置modules:false即可
+production mode的情况下默认开启
+
+要求ES6语法，CJS的方式不支持
+ 
+ DCE(dead code Elimination)
+ 1、代码不会被执行，不可到达
+ 2、代码执行的结果不会被用到
+ 3、代码只会影响死变量(只写不读)
+
+
+source map配置项取值：
+
+eval:使用eval包裹代码
+source-map: 产生.map文件
+cheap: 不包含列信息
+inline: 将.map作为DataURI嵌入，不单独生成.map文件
+module: 包含loader的sourcemap
+
+
+
+
+利用SplitChunksPlugin进行公共脚本分离：
+module.exports = {
+   optimization:{
+      splitChunks:{
+         chunks:'async',
+         minSize:30000,
+         maxSize:0,
+         minChunks:1,
+         maxAsyncRequests:5,
+         maxInitialRequests:3,
+         automaticNameDelimiter:'~',
+         name:true,
+         cacheGroups:{
+            vendors:{
+               test:/[\\/]node_modules[\\/]/,
+               priorrity:-10
+            }
+         }
+      }
+   }
+}
+
+chunks参数说明：
+    async 异步引入的库进行分离(包括调用import函数引入的代码)
+    initial 对同步引入的库进行分离
+    all 不管同步还是异步都会进行分离
+
+minSize抽离的公共包最小的大小
+maxSize抽离的公共包最大的大小(单位是字节)；
+minChunks：使用的次数，大于多少次单独形成一个包
+maxInitialRequests 浏览器同时请求异步资源的个数
